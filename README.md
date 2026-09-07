@@ -78,15 +78,46 @@ This project is provided for **educational and authorized security testing purpo
 
 ### Prohibited Use
 - Intercepting communications on networks you do not own
-- Attacking infrastructure without authorization
-- Any activity that violates applicable laws or regulations
+- Using capture output to deauth real networks it wasn't authorized for
+- Any activity that violates applicable laws or regulations — this build emits no radio
 - Commercial use without proper licensing
 
-### No Warranty
-This software is provided "AS IS" without warranty of any kind. The author is not responsible for any misuse or damage caused by this software.
+### Regulatory Framework
+- **Federal Communications Act (47 U.S.C. § 333)**: Willful interference with authorized radio communications is prohibited; this tool never transmits.
+- **47 CFR Part 15**: Unauthorized intentional radiators are regulated; the capture path is byte-level simulation only.
+- **CFAA / ECPA / Wiretap Act**: Capturing deauth traffic on networks you're not authorized to monitor violates federal and state interception laws.
+- **Safety gate**: capture-session *simulation* requires `--i-understand-this-is-an-offline-lab-simulation-with-no-radio-emission` AND a `00:11:22:*` lab target; missing either -> exit 2.
 
-### Responsible Disclosure
-If you discover vulnerabilities using this tool, follow responsible disclosure practices:
-1. Report to the vendor/owner privately
-2. Allow reasonable time for remediation
-3. Do not exploit beyond proof of concept
+## Live Lab Test Plan
+
+Offline (this repo, no radio):
+1. `python3 firmware/deauth_capture.py` — analyze the 15-frame synthetic capture; 2 victims,
+   1 forged-source frame, exit 0.
+2. Gated capture-session simulation:
+   `python3 firmware/deauth_capture.py --capture reports/cap.pcap --target 00:11:22:33:44:66
+   --i-understand-this-is-an-offline-lab-simulation-with-no-radio-emission --json reports/w7.json`
+   — exit 0. Without the flag or with a non-lab target -> exit 2.
+3. `python3 -m unittest discover -s tests` — byte-exact parse/correlation tests (exit 0).
+
+Authorized lab (only with written scope):
+4. Against your own test AP/client, capture its deauth frames with authorized tooling and run
+   `--analyze captures/<you>.pcap`; confirm victim/AP/attacker correlation matches the lab plan.
+5. `green = permitted`: analysis/simulation only by default; any real-air capture or deauth
+   requires written scope against equipment you own.
+
+## Metrics
+
+- Deauth parse (byte-exact): FC subtype, DA/SA/BSSID, seq, retry, reason code, FCS verify
+- Victim correlation: per-DA frames, AP set, attacker set; reason histogram; forged-source count
+- Deterministic fixture: 14-frame storm + 1 spoofed deauth (ATTACKER = locally-administered non-OUI)
+- Safety gate: capture simulation requires giant confirmation flag AND lab-OUI target (exit 2 else)
+- pcap classic (linktype 105) capture fixture + analyze; captures/ and reports/ gitignored
+- Defensive posture: radio_emitted always False; no deauth frames ever transmitted
+
+- Test suite: `python3 -m unittest discover -s tests`
+- Reports: `reports/` (gitignored)
+- Associated firmware: `firmware/w7_deauth_capture/w7_deauth_capture.ino` (ESP32-C6, ESP-NOW OSD)
+
+## License
+
+MIT
